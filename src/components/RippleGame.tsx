@@ -20,7 +20,6 @@ import {
   type SwitchEvent,
   type TargetSpec,
 } from "@/lib/game/types";
-import { RippleAudio } from "@/lib/game/audio";
 import { ShapePreview } from "./ShapePreview";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { predictFocusScore } from "@/lib/ml/predictFocusScore";
@@ -51,7 +50,6 @@ export function RippleGame() {
   const [target, setTarget] = useState<TargetSpec>(() => pickRandomTarget());
   const [scoreResult, setScoreResult] = useState<ScoreBreakdown | null>(null);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
-  const [muted, setMuted] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
   // Reactive to auth state rather than a one-time "seen it" flag: reappears
   // for every round a signed-out player is about to start, never once
@@ -73,17 +71,10 @@ export function RippleGame() {
   const bannerUntilRef = useRef(0);
   const bannerTargetRef = useRef<TargetSpec | null>(null);
   const effectsRef = useRef<TapEffect[]>([]);
-  const audioRef = useRef<RippleAudio | null>(null);
-  const mutedRef = useRef(muted);
   // ML-personalized ramp start for the *next* round (0..1). Stays 0 — the
   // original fixed-curve default — until a signed-in player's first
   // /api/session response comes back with a recommendation.
   const startProgressRef = useRef(0);
-
-  useEffect(() => {
-    mutedRef.current = muted;
-    audioRef.current?.setMuted(muted);
-  }, [muted]);
 
   useEffect(() => {
     idTokenRef.current = idToken;
@@ -99,7 +90,6 @@ export function RippleGame() {
     if (isAway && !pausedRef.current) {
       pausedRef.current = true;
       pauseStartedAtRef.current = performance.now();
-      audioRef.current?.stopAmbience();
       return;
     }
 
@@ -115,8 +105,6 @@ export function RippleGame() {
       nextSpawnAtRef.current += pausedFor;
       bannerUntilRef.current += pausedFor;
       pulsesRef.current = pulsesRef.current.map((p) => ({ ...p, spawnedAt: p.spawnedAt + pausedFor }));
-
-      audioRef.current?.startAmbience();
     }
   }
 
@@ -216,10 +204,6 @@ export function RippleGame() {
     roundStartRef.current = performance.now();
     nextSpawnAtRef.current = performance.now() + 400;
 
-    if (!audioRef.current) audioRef.current = new RippleAudio();
-    audioRef.current.setMuted(mutedRef.current);
-    audioRef.current.startAmbience();
-
     setPhase("playing");
   }
 
@@ -239,7 +223,6 @@ export function RippleGame() {
     let rafId = 0;
 
     function finishRound() {
-      audioRef.current?.stopAmbience();
       const honest = computeScore(telemetryRef.current);
       // The headline number comes from the learned model (step 5); the
       // breakdown lines stay the transparent formula-derived values so the
@@ -309,7 +292,6 @@ export function RippleGame() {
         if (hasReachedCore(p)) {
           if (p.isTarget) {
             telemetryRef.current.missCount++;
-            audioRef.current?.miss();
           } else {
             telemetryRef.current.decoyCorrectCount++;
           }
@@ -371,10 +353,8 @@ export function RippleGame() {
       if (pendingSwitch) {
         pendingSwitch.respondedAtMs = now - roundStartRef.current - pendingSwitch.atMs;
       }
-      audioRef.current?.correctHit();
     } else {
       telemetryRef.current.falseTapCount++;
-      audioRef.current?.falseTap();
     }
   }
 
@@ -478,23 +458,11 @@ export function RippleGame() {
         )}
 
         {showWelcome && (
-          <WelcomeIntro
-            onContinue={handleWelcomeContinue}
-            onSignIn={handleWelcomeSignIn}
-            soundOn={!muted}
-            onToggleSound={() => setMuted((m) => !m)}
-          />
+          <WelcomeIntro onContinue={handleWelcomeContinue} onSignIn={handleWelcomeSignIn} />
         )}
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <button
-          onClick={() => setMuted((m) => !m)}
-          className="text-xs"
-          style={{ color: THEME.inkFaint }}
-        >
-          {muted ? "Sound off" : "Sound on"}
-        </button>
         {attention.error && (
           <p className="text-xs" style={{ color: THEME.danger }}>
             {attention.error}
