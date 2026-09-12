@@ -24,6 +24,8 @@ import { RippleAudio } from "@/lib/game/audio";
 import { ShapePreview } from "./ShapePreview";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { predictFocusScore } from "@/lib/ml/predictFocusScore";
+import { AttentionConsent } from "./AttentionConsent";
+import { getStoredConsent, useAttentionTracking } from "@/lib/attention/useAttentionTracking";
 import Link from "next/link";
 
 function switchAccuracy(switchEvents: SwitchEvent[]): number {
@@ -45,7 +47,11 @@ export function RippleGame() {
   const [scoreResult, setScoreResult] = useState<ScoreBreakdown | null>(null);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [muted, setMuted] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
   const idTokenRef = useRef(idToken);
+  const phaseRef = useRef<Phase>(phase);
+  const pausedRef = useRef(false);
+  const pauseStartedAtRef = useRef<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pulsesRef = useRef<Pulse[]>([]);
@@ -72,6 +78,51 @@ export function RippleGame() {
   useEffect(() => {
     idTokenRef.current = idToken;
   }, [idToken]);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  function handleAwayChange(isAway: boolean) {
+    if (phaseRef.current !== "playing") return;
+
+    if (isAway && !pausedRef.current) {
+      pausedRef.current = true;
+      pauseStartedAtRef.current = performance.now();
+      audioRef.current?.stopAmbience();
+      return;
+    }
+
+    if (!isAway && pausedRef.current) {
+      const now = performance.now();
+      const pausedFor = now - (pauseStartedAtRef.current ?? now);
+      pausedRef.current = false;
+      pauseStartedAtRef.current = null;
+
+      // Shift every timestamp forward by the paused duration so the pause
+      // doesn't cost the player round time or skew reaction-time telemetry.
+      roundStartRef.current += pausedFor;
+      nextSpawnAtRef.current += pausedFor;
+      bannerUntilRef.current += pausedFor;
+      pulsesRef.current = pulsesRef.current.map((p) => ({ ...p, spawnedAt: p.spawnedAt + pausedFor }));
+
+      audioRef.current?.startAmbience();
+    }
+  }
+
+  const attention = useAttentionTracking(handleAwayChange);
+
+  function handleToggleAttention() {
+    if (attention.enabled) {
+      attention.disable();
+      return;
+    }
+    if (getStoredConsent() === "granted") {
+      attention.enable();
+    } else {
+      setShowConsent(true);
+    }
+  }
 
   async function reportSession(score: ScoreBreakdown) {
     const token = idTokenRef.current;
@@ -139,6 +190,8 @@ export function RippleGame() {
     bannerUntilRef.current = 0;
     bannerTargetRef.current = null;
     effectsRef.current = [];
+    pausedRef.current = false;
+    pauseStartedAtRef.current = null;
     roundStartRef.current = performance.now();
     nextSpawnAtRef.current = performance.now() + 400;
 
@@ -184,6 +237,21 @@ export function RippleGame() {
     }
 
     function frame(now: number) {
+      if (pausedRef.current) {
+        renderFrame(ctx, {
+          now,
+          elapsedMs: now - roundStartRef.current,
+          pulses: pulsesRef.current,
+          target: targetRef.current,
+          bannerUntil: bannerUntilRef.current,
+          bannerTarget: bannerTargetRef.current,
+          effects: effectsRef.current,
+          paused: true,
+        });
+        rafId = requestAnimationFrame(frame);
+        return;
+      }
+
       const elapsed = now - roundStartRef.current;
 
       if (elapsed >= ROUND_DURATION_MS) {
@@ -239,6 +307,7 @@ export function RippleGame() {
         bannerUntil: bannerUntilRef.current,
         bannerTarget: bannerTargetRef.current,
         effects: effectsRef.current,
+        paused: false,
       });
 
       rafId = requestAnimationFrame(frame);
@@ -249,7 +318,7 @@ export function RippleGame() {
   }, [phase]);
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || pausedRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -348,15 +417,37 @@ export function RippleGame() {
             </button>
           </Overlay>
         )}
+
+        {showConsent && (
+          <AttentionConsent
+            onAllow={() => {
+              setShowConsent(false);
+              attention.enable();
+            }}
+            onDecline={() => setShowConsent(false)}
+          />
+        )}
       </div>
 
-      <button
-        onClick={() => setMuted((m) => !m)}
-        className="text-xs"
-        style={{ color: "#9aa5ab" }}
-      >
-        {muted ? "Sound off" : "Sound on"}
-      </button>
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex gap-4">
+          <button
+            onClick={() => setMuted((m) => !m)}
+            className="text-xs"
+            style={{ color: "#9aa5ab" }}
+          >
+            {muted ? "Sound off" : "Sound on"}
+          </button>
+          <button onClick={handleToggleAttention} className="text-xs" style={{ color: "#9aa5ab" }}>
+            {attention.enabled ? "Attention tracking on" : "Track attention with camera"}
+          </button>
+        </div>
+        {attention.error && (
+          <p className="text-xs" style={{ color: "#b05550" }}>
+            {attention.error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

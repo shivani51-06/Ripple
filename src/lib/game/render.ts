@@ -19,6 +19,7 @@ export interface RenderState {
   bannerUntil: number;
   bannerTarget: TargetSpec | null;
   effects: TapEffect[];
+  paused: boolean;
 }
 
 const BG = "#f4f1ec";
@@ -115,4 +116,19 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
   }
 
   ctx.fillStyle = INK;
+
+  // Attention-tracking pause — drawn last, over everything else.
+  if (s.paused) {
+    ctx.save();
+    ctx.fillStyle = "rgba(244, 241, 236, 0.88)";
+    ctx.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
+    ctx.fillStyle = "rgba(58, 71, 80, 0.9)";
+    ctx.textAlign = "center";
+    ctx.font = "600 20px system-ui, sans-serif";
+    ctx.fillText("Paused", CENTER.x, CENTER.y - 12);
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillStyle = MUTED_INK;
+    ctx.fillText("Look back at the screen to continue", CENTER.x, CENTER.y + 14);
+    ctx.restore();
+  }
 }
