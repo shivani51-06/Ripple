@@ -12,11 +12,15 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Hardcoded difficulty curve (step 2 of the build: hardcode this, replace
- * with the trained model's output once telemetry exists to train on).
+ * The curve shape itself stays fixed (hardcoded, step 2 of the build); what
+ * changed in step 5 is where a round starts along it. `startProgress` (0..1)
+ * is the ML-predicted personalization — a player who did well last round
+ * starts further along the ramp, a struggling player starts earlier. New /
+ * first-time players default to 0, which reproduces the original all-players
+ * ramp exactly.
  */
-export function getDifficulty(elapsedMs: number): DifficultyParams {
-  const t = elapsedMs / ROUND_DURATION_MS;
+export function getDifficulty(elapsedMs: number, startProgress = 0): DifficultyParams {
+  const t = startProgress + elapsedMs / ROUND_DURATION_MS;
   return {
     spawnIntervalMs: lerp(1400, 650, t),
     speedPxPerSec: lerp(90, 150, t),

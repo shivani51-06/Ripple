@@ -3,6 +3,7 @@ import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, USERS_TABLE, SESSIONS_TABLE } from "@/lib/dynamo";
 import { applyRoundToStreak, type UserStreakRecord } from "@/lib/streak";
+import { predictNextStartProgress } from "@/lib/ml/predictDifficulty";
 
 // Built lazily (not at module load) so a missing env var only fails a real
 // request, not the production build itself.
@@ -23,6 +24,9 @@ interface SessionSummaryPayload {
   goAccuracy: number;
   inhibitionAccuracy: number;
   meanReactionMs: number | null;
+  reactionConsistency: number;
+  targetSwitchAccuracy: number;
+  startProgress: number;
   targetHitCount: number;
   missCount: number;
   falseTapCount: number;
@@ -54,17 +58,28 @@ export async function POST(req: NextRequest) {
 
   const { record, countedTowardStreak } = applyRoundToStreak(previous);
 
+  const nextStartProgress = predictNextStartProgress({
+    reactionTimeMeanMs: summary.meanReactionMs ?? 700,
+    reactionTimeStdMs: (1 - summary.reactionConsistency) * 600,
+    falseTapRate: 1 - summary.inhibitionAccuracy,
+    missRate: 1 - summary.goAccuracy,
+    targetSwitchAccuracy: summary.targetSwitchAccuracy,
+    startProgress: summary.startProgress,
+    focusScore: summary.focusScore,
+  });
+
   await ddb.send(
     new UpdateCommand({
       TableName: USERS_TABLE,
       Key: { userId },
       UpdateExpression:
-        "SET currentStreak = :currentStreak, longestStreak = :longestStreak, lastPlayedDate = :lastPlayedDate, roundsPlayedToday = :roundsPlayedToday",
+        "SET currentStreak = :currentStreak, longestStreak = :longestStreak, lastPlayedDate = :lastPlayedDate, roundsPlayedToday = :roundsPlayedToday, startProgress = :startProgress",
       ExpressionAttributeValues: {
         ":currentStreak": record.currentStreak,
         ":longestStreak": record.longestStreak,
         ":lastPlayedDate": record.lastPlayedDate,
         ":roundsPlayedToday": record.roundsPlayedToday,
+        ":startProgress": nextStartProgress,
       },
     }),
   );
@@ -87,5 +102,6 @@ export async function POST(req: NextRequest) {
     longestStreak: record.longestStreak,
     roundsPlayedToday: record.roundsPlayedToday,
     countedTowardStreak,
+    nextStartProgress,
   });
 }

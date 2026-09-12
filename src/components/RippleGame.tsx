@@ -13,11 +13,23 @@ import {
 import { ROUND_DURATION_MS, TARGET_SWITCH_TIMES_MS, getDifficulty } from "@/lib/game/difficulty";
 import { renderFrame, type TapEffect } from "@/lib/game/render";
 import { computeScore, type ScoreBreakdown } from "@/lib/game/scoring";
-import { createEmptyTelemetry, type Pulse, type RoundTelemetry, type TargetSpec } from "@/lib/game/types";
+import {
+  createEmptyTelemetry,
+  type Pulse,
+  type RoundTelemetry,
+  type SwitchEvent,
+  type TargetSpec,
+} from "@/lib/game/types";
 import { RippleAudio } from "@/lib/game/audio";
 import { ShapePreview } from "./ShapePreview";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { predictFocusScore } from "@/lib/ml/predictFocusScore";
 import Link from "next/link";
+
+function switchAccuracy(switchEvents: SwitchEvent[]): number {
+  if (switchEvents.length === 0) return 1;
+  return switchEvents.filter((e) => e.respondedAtMs !== null).length / switchEvents.length;
+}
 
 type Phase = "ready" | "playing" | "summary";
 
@@ -47,6 +59,10 @@ export function RippleGame() {
   const effectsRef = useRef<TapEffect[]>([]);
   const audioRef = useRef<RippleAudio | null>(null);
   const mutedRef = useRef(muted);
+  // ML-personalized ramp start for the *next* round (0..1). Stays 0 — the
+  // original fixed-curve default — until a signed-in player's first
+  // /api/session response comes back with a recommendation.
+  const startProgressRef = useRef(0);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -69,6 +85,9 @@ export function RippleGame() {
           goAccuracy: score.goAccuracy,
           inhibitionAccuracy: score.inhibitionAccuracy,
           meanReactionMs: score.meanReactionMs,
+          reactionConsistency: score.reactionConsistency,
+          targetSwitchAccuracy: switchAccuracy(telemetryRef.current.switchEvents),
+          startProgress: startProgressRef.current,
           targetHitCount: telemetryRef.current.targetHitCount,
           missCount: telemetryRef.current.missCount,
           falseTapCount: telemetryRef.current.falseTapCount,
@@ -77,6 +96,9 @@ export function RippleGame() {
       if (!res.ok) return;
       const data = await res.json();
       setStreakInfo({ currentStreak: data.currentStreak, countedTowardStreak: data.countedTowardStreak });
+      if (typeof data.nextStartProgress === "number") {
+        startProgressRef.current = data.nextStartProgress;
+      }
     } catch {
       // Streak tracking is a bonus, not a gameplay requirement — fail quietly.
     }
@@ -143,7 +165,18 @@ export function RippleGame() {
 
     function finishRound() {
       audioRef.current?.stopAmbience();
-      const result = computeScore(telemetryRef.current);
+      const honest = computeScore(telemetryRef.current);
+      // The headline number comes from the learned model (step 5); the
+      // breakdown lines stay the transparent formula-derived values so the
+      // score is never a black box to the player.
+      const mlFocusScore = predictFocusScore({
+        reactionTimeMeanMs: honest.meanReactionMs ?? 700,
+        reactionTimeStdMs: (1 - honest.reactionConsistency) * 600,
+        falseTapRate: 1 - honest.inhibitionAccuracy,
+        missRate: 1 - honest.goAccuracy,
+        targetSwitchAccuracy: switchAccuracy(telemetryRef.current.switchEvents),
+      });
+      const result: ScoreBreakdown = { ...honest, focusScore: mlFocusScore };
       setScoreResult(result);
       setPhase("summary");
       reportSession(result);
@@ -158,7 +191,7 @@ export function RippleGame() {
         return;
       }
 
-      const difficulty = getDifficulty(elapsed);
+      const difficulty = getDifficulty(elapsed, startProgressRef.current);
 
       while (
         switchIndexRef.current < TARGET_SWITCH_TIMES_MS.length &&
