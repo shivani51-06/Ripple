@@ -1,0 +1,260 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  LOGICAL_SIZE,
+  findTappedPulse,
+  hasReachedCore,
+  hueToColor,
+  pickRandomTarget,
+  spawnPulse,
+  stepPulse,
+} from "@/lib/game/engine";
+import { ROUND_DURATION_MS, TARGET_SWITCH_TIMES_MS, getDifficulty } from "@/lib/game/difficulty";
+import { renderFrame, type TapEffect } from "@/lib/game/render";
+import { computeScore, type ScoreBreakdown } from "@/lib/game/scoring";
+import { createEmptyTelemetry, type Pulse, type RoundTelemetry, type TargetSpec } from "@/lib/game/types";
+import { RippleAudio } from "@/lib/game/audio";
+import { ShapePreview } from "./ShapePreview";
+
+type Phase = "ready" | "playing" | "summary";
+
+export function RippleGame() {
+  const [phase, setPhase] = useState<Phase>("ready");
+  const [target, setTarget] = useState<TargetSpec>(() => pickRandomTarget());
+  const [scoreResult, setScoreResult] = useState<ScoreBreakdown | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pulsesRef = useRef<Pulse[]>([]);
+  const telemetryRef = useRef<RoundTelemetry>(createEmptyTelemetry());
+  const targetRef = useRef<TargetSpec>(target);
+  const roundStartRef = useRef(0);
+  const nextSpawnAtRef = useRef(0);
+  const switchIndexRef = useRef(0);
+  const bannerUntilRef = useRef(0);
+  const bannerTargetRef = useRef<TargetSpec | null>(null);
+  const effectsRef = useRef<TapEffect[]>([]);
+  const audioRef = useRef<RippleAudio | null>(null);
+  const mutedRef = useRef(muted);
+
+  useEffect(() => {
+    mutedRef.current = muted;
+    audioRef.current?.setMuted(muted);
+  }, [muted]);
+
+  function startRound() {
+    // Reuses whatever target is already shown on the ready screen — it must
+    // never change between "here's your target" and the round actually
+    // starting, or the shown preview lies to the player.
+    targetRef.current = target;
+    pulsesRef.current = [];
+    telemetryRef.current = createEmptyTelemetry();
+    switchIndexRef.current = 0;
+    bannerUntilRef.current = 0;
+    bannerTargetRef.current = null;
+    effectsRef.current = [];
+    roundStartRef.current = performance.now();
+    nextSpawnAtRef.current = performance.now() + 400;
+
+    if (!audioRef.current) audioRef.current = new RippleAudio();
+    audioRef.current.setMuted(mutedRef.current);
+    audioRef.current.startAmbience();
+
+    setPhase("playing");
+  }
+
+  function prepareNextRound() {
+    setTarget(pickRandomTarget());
+    setPhase("ready");
+  }
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const canvas = canvasRef.current;
+    const maybeCtx = canvas?.getContext("2d");
+    if (!canvas || !maybeCtx) return;
+    const ctx: CanvasRenderingContext2D = maybeCtx;
+
+    let rafId = 0;
+
+    function finishRound() {
+      audioRef.current?.stopAmbience();
+      const result = computeScore(telemetryRef.current);
+      setScoreResult(result);
+      setPhase("summary");
+    }
+
+    function frame(now: number) {
+      const elapsed = now - roundStartRef.current;
+
+      if (elapsed >= ROUND_DURATION_MS) {
+        finishRound();
+        return;
+      }
+
+      const difficulty = getDifficulty(elapsed);
+
+      while (
+        switchIndexRef.current < TARGET_SWITCH_TIMES_MS.length &&
+        elapsed >= TARGET_SWITCH_TIMES_MS[switchIndexRef.current]
+      ) {
+        const newTarget = pickRandomTarget(targetRef.current.shape);
+        targetRef.current = newTarget;
+        setTarget(newTarget);
+        telemetryRef.current.switchEvents.push({ atMs: elapsed, respondedAtMs: null });
+        bannerUntilRef.current = now + 1600;
+        bannerTargetRef.current = newTarget;
+        switchIndexRef.current++;
+      }
+
+      if (now >= nextSpawnAtRef.current) {
+        pulsesRef.current.push(spawnPulse(targetRef.current, difficulty, now));
+        nextSpawnAtRef.current = now + difficulty.spawnIntervalMs * (0.85 + Math.random() * 0.3);
+      }
+
+      const dtSec = 1 / 60;
+      const stillActive: Pulse[] = [];
+      for (const raw of pulsesRef.current) {
+        if (raw.resolved) continue;
+        const p = stepPulse(raw, dtSec);
+        if (hasReachedCore(p)) {
+          if (p.isTarget) {
+            telemetryRef.current.missCount++;
+            audioRef.current?.miss();
+          } else {
+            telemetryRef.current.decoyCorrectCount++;
+          }
+          continue;
+        }
+        stillActive.push(p);
+      }
+      pulsesRef.current = stillActive;
+
+      effectsRef.current = effectsRef.current.filter((e) => now - e.startedAt < 450);
+
+      renderFrame(ctx, {
+        now,
+        elapsedMs: elapsed,
+        pulses: pulsesRef.current,
+        target: targetRef.current,
+        bannerUntil: bannerUntilRef.current,
+        bannerTarget: bannerTargetRef.current,
+        effects: effectsRef.current,
+      });
+
+      rafId = requestAnimationFrame(frame);
+    }
+
+    rafId = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafId);
+  }, [phase]);
+
+  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (phase !== "playing") return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * LOGICAL_SIZE;
+    const y = ((e.clientY - rect.top) / rect.height) * LOGICAL_SIZE;
+
+    const tapped = findTappedPulse(pulsesRef.current, x, y);
+    if (!tapped) return;
+
+    tapped.resolved = true;
+    pulsesRef.current = pulsesRef.current.filter((p) => p.id !== tapped.id);
+
+    const now = performance.now();
+    effectsRef.current.push({
+      x: tapped.x,
+      y: tapped.y,
+      color: hueToColor(tapped.hue),
+      startedAt: now,
+      correct: tapped.isTarget,
+    });
+
+    if (tapped.isTarget) {
+      telemetryRef.current.reactionTimesMs.push(now - tapped.spawnedAt);
+      telemetryRef.current.targetHitCount++;
+      const pendingSwitch = telemetryRef.current.switchEvents.find(
+        (se) => se.respondedAtMs === null,
+      );
+      if (pendingSwitch) {
+        pendingSwitch.respondedAtMs = now - roundStartRef.current - pendingSwitch.atMs;
+      }
+      audioRef.current?.correctHit();
+    } else {
+      telemetryRef.current.falseTapCount++;
+      audioRef.current?.falseTap();
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div
+        className="relative overflow-hidden rounded-2xl shadow-sm"
+        style={{ width: "min(90vw, 560px)", height: "min(90vw, 560px)" }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={LOGICAL_SIZE}
+          height={LOGICAL_SIZE}
+          onPointerDown={handlePointerDown}
+          style={{ width: "100%", height: "100%", touchAction: "none" }}
+        />
+
+        {phase === "ready" && (
+          <Overlay>
+            <p className="text-sm" style={{ color: "#8a9399" }}>
+              Tap only the shape below. Let everything else drift past.
+            </p>
+            <ShapePreview shape={target.shape} hue={target.hue} size={72} />
+            <button onClick={startRound} className="btn-primary">
+              Start round
+            </button>
+          </Overlay>
+        )}
+
+        {phase === "summary" && scoreResult && (
+          <Overlay>
+            <p className="text-sm uppercase tracking-wide" style={{ color: "#8a9399" }}>
+              Focus score
+            </p>
+            <p className="text-5xl font-semibold" style={{ color: "#2f3e46" }}>
+              {scoreResult.focusScore}
+            </p>
+            <div className="text-sm" style={{ color: "#52616b" }}>
+              <p>Accuracy on target: {Math.round(scoreResult.goAccuracy * 100)}%</p>
+              <p>Correctly ignored decoys: {Math.round(scoreResult.inhibitionAccuracy * 100)}%</p>
+              {scoreResult.meanReactionMs !== null && (
+                <p>Avg reaction: {Math.round(scoreResult.meanReactionMs)}ms</p>
+              )}
+            </div>
+            <button onClick={prepareNextRound} className="btn-primary">
+              Play again
+            </button>
+          </Overlay>
+        )}
+      </div>
+
+      <button
+        onClick={() => setMuted((m) => !m)}
+        className="text-xs"
+        style={{ color: "#9aa5ab" }}
+      >
+        {muted ? "Sound off" : "Sound on"}
+      </button>
+    </div>
+  );
+}
+
+function Overlay({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center"
+      style={{ background: "rgba(244, 241, 236, 0.92)" }}
+    >
+      {children}
+    </div>
+  );
+}
