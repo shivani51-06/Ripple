@@ -25,7 +25,14 @@ import { ShapePreview } from "./ShapePreview";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { predictFocusScore } from "@/lib/ml/predictFocusScore";
 import { AttentionConsent } from "./AttentionConsent";
-import { getStoredConsent, useAttentionTracking } from "@/lib/attention/useAttentionTracking";
+import { WelcomeIntro } from "./WelcomeIntro";
+import { ToggleSwitch } from "./ToggleSwitch";
+import {
+  getStoredConsent,
+  hasSeenIntro,
+  markIntroSeen,
+  useAttentionTracking,
+} from "@/lib/attention/useAttentionTracking";
 import { THEME } from "@/lib/theme";
 import Link from "next/link";
 
@@ -49,6 +56,7 @@ export function RippleGame() {
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [muted, setMuted] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => !hasSeenIntro());
   const idTokenRef = useRef(idToken);
   const phaseRef = useRef<Phase>(phase);
   const pausedRef = useRef(false);
@@ -121,6 +129,14 @@ export function RippleGame() {
     if (getStoredConsent() === "granted") {
       attention.enable();
     } else {
+      setShowConsent(true);
+    }
+  }
+
+  function handleWelcomeContinue() {
+    markIntroSeen();
+    setShowWelcome(false);
+    if (getStoredConsent() === null) {
       setShowConsent(true);
     }
   }
@@ -377,6 +393,22 @@ export function RippleGame() {
               Tap only the shape below. Let everything else drift past.
             </p>
             <ShapePreview shape={target.shape} hue={target.hue} size={72} />
+
+            <div
+              className="flex w-full max-w-xs items-center justify-between gap-3 rounded-xl px-4 py-3"
+              style={{ background: `rgba(${THEME.inkRgb}, 0.06)` }}
+            >
+              <div className="text-left">
+                <p className="text-sm font-medium" style={{ color: THEME.ink }}>
+                  Pause when you look away
+                </p>
+                <p className="text-xs" style={{ color: THEME.inkMuted }}>
+                  Uses your camera, fully on-device. Optional.
+                </p>
+              </div>
+              <ToggleSwitch checked={attention.enabled} onChange={handleToggleAttention} />
+            </div>
+
             <button onClick={startRound} className="btn-primary">
               Start round
             </button>
@@ -428,21 +460,18 @@ export function RippleGame() {
             onDecline={() => setShowConsent(false)}
           />
         )}
+
+        {showWelcome && <WelcomeIntro onContinue={handleWelcomeContinue} />}
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setMuted((m) => !m)}
-            className="text-xs"
-            style={{ color: THEME.inkFaint }}
-          >
-            {muted ? "Sound off" : "Sound on"}
-          </button>
-          <button onClick={handleToggleAttention} className="text-xs" style={{ color: THEME.inkFaint }}>
-            {attention.enabled ? "Attention tracking on" : "Track attention with camera"}
-          </button>
-        </div>
+        <button
+          onClick={() => setMuted((m) => !m)}
+          className="text-xs"
+          style={{ color: THEME.inkFaint }}
+        >
+          {muted ? "Sound off" : "Sound on"}
+        </button>
         {attention.error && (
           <p className="text-xs" style={{ color: THEME.danger }}>
             {attention.error}
