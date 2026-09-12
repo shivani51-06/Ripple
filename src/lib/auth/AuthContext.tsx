@@ -7,8 +7,6 @@ interface AuthState {
   idToken: string | null;
   isReady: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
-  confirmSignUp: (email: string, code: string) => Promise<void>;
   signOut: () => void;
 }
 
@@ -41,12 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signIn(email, password) {
       const tokens = await cognito.signIn(email, password);
       persist(tokens.idToken);
-    },
-    async signUp(email, password) {
-      await cognito.signUp(email, password);
-    },
-    async confirmSignUp(email, code) {
-      await cognito.confirmSignUp(email, code);
     },
     signOut() {
       persist(null);

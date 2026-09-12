@@ -93,6 +93,18 @@ export class RippleStack extends cdk.Stack {
     sessionsTable.grantReadWriteData(apiUser);
     telemetryBucket.grantWrite(apiUser);
 
+    // Lets the server-side signup route create and confirm accounts
+    // directly, skipping email-code confirmation entirely. Cognito's
+    // built-in COGNITO_DEFAULT email (the only option without setting up
+    // SES) is capped at 50/day and has no delivery guarantees or
+    // visibility, which made real signups silently get stuck unconfirmed.
+    apiUser.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminSetUserPassword"],
+        resources: [userPool.userPoolArn],
+      }),
+    );
+
     new cdk.CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, "UsersTableName", { value: usersTable.tableName });

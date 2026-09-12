@@ -6,16 +6,15 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { THEME } from "@/lib/theme";
 
-type Mode = "sign-in" | "sign-up" | "confirm";
+type Mode = "sign-in" | "sign-up";
 
 export default function AccountPage() {
-  const { signIn, signUp, confirmSignUp, idToken, signOut } = useAuth();
+  const { signIn, idToken, signOut } = useAuth();
   const router = useRouter();
 
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,16 +23,21 @@ export default function AccountPage() {
     setError(null);
     setBusy(true);
     try {
-      if (mode === "sign-in") {
-        await signIn(email, password);
-        router.push("/");
-      } else if (mode === "sign-up") {
-        await signUp(email, password);
-        setMode("confirm");
-      } else {
-        await confirmSignUp(email, code);
-        setMode("sign-in");
+      if (mode === "sign-up") {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error ?? "Could not create account");
+        }
       }
+      // Signing up confirms the account server-side immediately, so
+      // signing in right after works whether this was sign-in or sign-up.
+      await signIn(email, password);
+      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -78,45 +82,25 @@ export default function AccountPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex w-full max-w-xs flex-col gap-3">
-        {mode !== "confirm" && (
-          <>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: THEME.inkFaint }}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: THEME.inkFaint }}
-            />
-          </>
-        )}
-        {mode === "confirm" && (
-          <>
-            <p className="text-sm" style={{ color: THEME.inkMuted }}>
-              Enter the code emailed to {email}.
-            </p>
-            <input
-              type="text"
-              placeholder="Confirmation code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
-              className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: THEME.inkFaint }}
-            />
-          </>
-        )}
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: THEME.inkFaint }}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+          className="rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: THEME.inkFaint }}
+        />
 
         {error && (
           <p className="text-sm" style={{ color: THEME.danger }}>
@@ -125,7 +109,7 @@ export default function AccountPage() {
         )}
 
         <button type="submit" disabled={busy} className="btn-primary">
-          {mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create account" : "Confirm"}
+          {mode === "sign-in" ? "Sign in" : "Create account"}
         </button>
       </form>
     </Shell>
