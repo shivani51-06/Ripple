@@ -17,17 +17,6 @@ function storeConsent(consent: CameraConsent) {
   localStorage.setItem(CONSENT_KEY, consent);
 }
 
-const INTRO_SEEN_KEY = "ripple.seenIntro";
-
-export function hasSeenIntro(): boolean {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(INTRO_SEEN_KEY) === "true";
-}
-
-export function markIntroSeen(): void {
-  localStorage.setItem(INTRO_SEEN_KEY, "true");
-}
-
 interface UseAttentionTrackingResult {
   enabled: boolean;
   isAway: boolean;

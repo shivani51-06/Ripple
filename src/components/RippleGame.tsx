@@ -27,12 +27,7 @@ import { predictFocusScore } from "@/lib/ml/predictFocusScore";
 import { AttentionConsent } from "./AttentionConsent";
 import { WelcomeIntro } from "./WelcomeIntro";
 import { ToggleSwitch } from "./ToggleSwitch";
-import {
-  getStoredConsent,
-  hasSeenIntro,
-  markIntroSeen,
-  useAttentionTracking,
-} from "@/lib/attention/useAttentionTracking";
+import { getStoredConsent, useAttentionTracking } from "@/lib/attention/useAttentionTracking";
 import { THEME } from "@/lib/theme";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,7 +53,11 @@ export function RippleGame() {
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [muted, setMuted] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(() => !hasSeenIntro());
+  // Reactive to auth state rather than a one-time "seen it" flag: reappears
+  // for every round a signed-out player is about to start, never once
+  // they're signed in, and resets each time prepareNextRound() runs.
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const showWelcome = phase === "ready" && !idToken && !welcomeDismissed;
   const idTokenRef = useRef(idToken);
   const phaseRef = useRef<Phase>(phase);
   const pausedRef = useRef(false);
@@ -136,15 +135,13 @@ export function RippleGame() {
   }
 
   function handleWelcomeContinue() {
-    markIntroSeen();
-    setShowWelcome(false);
+    setWelcomeDismissed(true);
     if (getStoredConsent() === null) {
       setShowConsent(true);
     }
   }
 
   function handleWelcomeSignIn() {
-    markIntroSeen();
     router.push("/account");
   }
 
@@ -228,6 +225,7 @@ export function RippleGame() {
 
   function prepareNextRound() {
     setTarget(pickRandomTarget());
+    setWelcomeDismissed(false);
     setPhase("ready");
   }
 
