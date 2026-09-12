@@ -1,14 +1,30 @@
-# Welcome to your CDK TypeScript project
+# Ripple infrastructure
 
-This is a blank project for CDK development with TypeScript.
+AWS CDK (TypeScript) stack for Ripple's backend resources. See the main
+project README for the full architecture writeup; this covers just the
+commands.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## What this provisions
 
-## Useful commands
+- A Cognito User Pool + client (Lite feature plan, free indefinitely)
+- Two DynamoDB tables, `ripple-users` and `ripple-sessions` (provisioned
+  capacity, 5 RCU/5 WCU each, well under AWS's permanent free tier)
+- An S3 bucket for raw telemetry, with a 90 day expiry lifecycle rule
+- A scoped IAM user (`ripple-api`) with read/write access to just those
+  three resources, for the Next.js app's server-side API routes
 
-* `npm run build`   type-check the project
-* `npm run watch`   watch for changes and type-check
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+## Commands
+
+```bash
+npm install          # one-time
+npx cdk synth         # preview the generated CloudFormation, no AWS calls
+npx cdk bootstrap      # one-time per AWS account/region
+npx cdk deploy --require-approval never
+npx cdk diff           # compare deployed stack with current code
+```
+
+After deploying, the stack prints the values needed for the app's
+`.env.local` (see `.env.example` at the repo root) as CloudFormation
+outputs. The one value CDK cannot produce is the `ripple-api` user's
+access key: create it manually in the IAM console (Users, ripple-api,
+Security credentials, Create access key).
