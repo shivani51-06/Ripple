@@ -16,14 +16,24 @@ import { computeScore, type ScoreBreakdown } from "@/lib/game/scoring";
 import { createEmptyTelemetry, type Pulse, type RoundTelemetry, type TargetSpec } from "@/lib/game/types";
 import { RippleAudio } from "@/lib/game/audio";
 import { ShapePreview } from "./ShapePreview";
+import { useAuth } from "@/lib/auth/AuthContext";
+import Link from "next/link";
 
 type Phase = "ready" | "playing" | "summary";
 
+interface StreakInfo {
+  currentStreak: number;
+  countedTowardStreak: boolean;
+}
+
 export function RippleGame() {
+  const { idToken } = useAuth();
   const [phase, setPhase] = useState<Phase>("ready");
   const [target, setTarget] = useState<TargetSpec>(() => pickRandomTarget());
   const [scoreResult, setScoreResult] = useState<ScoreBreakdown | null>(null);
+  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [muted, setMuted] = useState(false);
+  const idTokenRef = useRef(idToken);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pulsesRef = useRef<Pulse[]>([]);
@@ -43,6 +53,35 @@ export function RippleGame() {
     audioRef.current?.setMuted(muted);
   }, [muted]);
 
+  useEffect(() => {
+    idTokenRef.current = idToken;
+  }, [idToken]);
+
+  async function reportSession(score: ScoreBreakdown) {
+    const token = idTokenRef.current;
+    if (!token) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          focusScore: score.focusScore,
+          goAccuracy: score.goAccuracy,
+          inhibitionAccuracy: score.inhibitionAccuracy,
+          meanReactionMs: score.meanReactionMs,
+          targetHitCount: telemetryRef.current.targetHitCount,
+          missCount: telemetryRef.current.missCount,
+          falseTapCount: telemetryRef.current.falseTapCount,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setStreakInfo({ currentStreak: data.currentStreak, countedTowardStreak: data.countedTowardStreak });
+    } catch {
+      // Streak tracking is a bonus, not a gameplay requirement — fail quietly.
+    }
+  }
+
   function startRound() {
     // Reuses whatever target is already shown on the ready screen — it must
     // never change between "here's your target" and the round actually
@@ -50,6 +89,7 @@ export function RippleGame() {
     targetRef.current = target;
     pulsesRef.current = [];
     telemetryRef.current = createEmptyTelemetry();
+    setStreakInfo(null);
     switchIndexRef.current = 0;
     bannerUntilRef.current = 0;
     bannerTargetRef.current = null;
@@ -83,6 +123,7 @@ export function RippleGame() {
       const result = computeScore(telemetryRef.current);
       setScoreResult(result);
       setPhase("summary");
+      reportSession(result);
     }
 
     function frame(now: number) {
@@ -230,6 +271,21 @@ export function RippleGame() {
                 <p>Avg reaction: {Math.round(scoreResult.meanReactionMs)}ms</p>
               )}
             </div>
+
+            {idToken ? (
+              streakInfo && (
+                <p className="text-sm" style={{ color: "#4a6a7a" }}>
+                  {streakInfo.countedTowardStreak
+                    ? `Streak: ${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? "" : "s"}`
+                    : "Streak already counted for today"}
+                </p>
+              )
+            ) : (
+              <Link href="/account" className="text-sm underline" style={{ color: "#8a9399" }}>
+                Sign in to save your streak
+              </Link>
+            )}
+
             <button onClick={prepareNextRound} className="btn-primary">
               Play again
             </button>
