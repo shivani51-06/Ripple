@@ -1,11 +1,11 @@
 {
-  "name": "Ripple — Focus Training",
+  "name": "Ripple: Focus Training",
   "short_name": "Ripple",
   "description": "A short, calm attention-training game. Not another feed to scroll.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f1ec",
-  "theme_color": "#4a6a7a",
+  "background_color": "#e9d3a8",
+  "theme_color": "#e9d3a8",
   "orientation": "portrait",
   "icons": [
     {

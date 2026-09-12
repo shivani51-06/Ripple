@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f1ec;
-  --foreground: #2f3e46;
+  --background: #e9d3a8;
+  --foreground: #4a3728;
 }
 
 @theme inline {
@@ -13,7 +13,7 @@
 }
 
 body {
-  background: var(--background);
+  background: radial-gradient(circle at 30% 15%, #f7ecd6, #e9d3a8 70%);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
@@ -21,13 +21,13 @@ body {
 .btn-primary {
   padding: 0.6rem 1.6rem;
   border-radius: 999px;
-  background: #4a6a7a;
-  color: #f4f1ec;
+  background: #4a3323;
+  color: #f7ecd9;
   font-size: 0.9rem;
   font-weight: 500;
   transition: background-color 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: #3d5866;
+  background: #3a271b;
 }

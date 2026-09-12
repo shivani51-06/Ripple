@@ -1,5 +1,6 @@
 import { SHAPE_TYPES, shapeSimilarity, type ShapeType } from "./shapes";
 import type { DifficultyParams, Pulse, TargetSpec } from "./types";
+import { PULSE_HUES, PULSE_SATURATION, PULSE_LIGHTNESS } from "@/lib/theme";
 
 export const LOGICAL_SIZE = 640;
 export const CENTER = { x: LOGICAL_SIZE / 2, y: LOGICAL_SIZE / 2 };
@@ -7,15 +8,13 @@ export const ARENA_RADIUS = 290;
 export const CORE_RADIUS = 28;
 export const PULSE_RADIUS = 20;
 
-// Calm, muted palette — kept desaturated so the game reads as calm rather
-// than alarming even when difficulty (and pulse density) is high.
-export const PALETTE_HUES = [200, 265, 20, 145];
-const SATURATION = 42;
-const LIGHTNESS = 56;
+// Kept desaturated enough that the game reads as calm, not alarming, even
+// when difficulty (and pulse density) is high.
+export const PALETTE_HUES = PULSE_HUES;
 
 export function hueToColor(hue: number): string {
   const h = ((hue % 360) + 360) % 360;
-  return `hsl(${h}, ${SATURATION}%, ${LIGHTNESS}%)`;
+  return `hsl(${h}, ${PULSE_SATURATION}%, ${PULSE_LIGHTNESS}%)`;
 }
 
 export function pickRandomTarget(excludeShape?: ShapeType): TargetSpec {

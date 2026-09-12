@@ -1,6 +1,7 @@
 "use client";
 
 import { storeCameraConsent } from "@/lib/attention/useAttentionTracking";
+import { THEME } from "@/lib/theme";
 
 export function AttentionConsent({
   onAllow,
@@ -12,17 +13,17 @@ export function AttentionConsent({
   return (
     <div
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 px-8 text-center"
-      style={{ background: "rgba(244, 241, 236, 0.97)" }}
+      style={{ background: `rgba(${THEME.surfaceRgb}, 0.97)` }}
     >
-      <h2 className="text-lg font-semibold" style={{ color: "#2f3e46" }}>
+      <h2 className="text-lg font-semibold" style={{ color: THEME.ink }}>
         Pause when you look away?
       </h2>
-      <p className="max-w-xs text-sm" style={{ color: "#52616b" }}>
+      <p className="max-w-xs text-sm" style={{ color: THEME.inkMuted }}>
         Ripple can use your camera to notice when you look away and pause the
-        round until you&apos;re back. Everything happens on your device —
+        round until you&apos;re back. Everything happens on your device, and
         nothing is recorded, saved, or sent anywhere.
       </p>
-      <p className="max-w-xs text-sm" style={{ color: "#8a9399" }}>
+      <p className="max-w-xs text-sm" style={{ color: THEME.inkFaint }}>
         This is entirely optional. Ripple works fully without it.
       </p>
       <div className="flex gap-3">
@@ -32,7 +33,7 @@ export function AttentionConsent({
             onDecline();
           }}
           className="text-sm underline"
-          style={{ color: "#8a9399" }}
+          style={{ color: THEME.inkFaint }}
         >
           Not now
         </button>

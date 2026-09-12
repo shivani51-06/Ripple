@@ -2,6 +2,7 @@ import { drawShape } from "./shapes";
 import { CENTER, ARENA_RADIUS, CORE_RADIUS, LOGICAL_SIZE, hueToColor } from "./engine";
 import { ROUND_DURATION_MS } from "./difficulty";
 import type { Pulse, TargetSpec } from "./types";
+import { THEME } from "@/lib/theme";
 
 export interface TapEffect {
   x: number;
@@ -22,9 +23,9 @@ export interface RenderState {
   paused: boolean;
 }
 
-const BG = "#f4f1ec";
-const INK = "#3a4750";
-const MUTED_INK = "#8a9399";
+const BG = THEME.surface;
+const INK = THEME.ink;
+const MUTED_INK = THEME.inkMuted;
 
 export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
   ctx.clearRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
@@ -33,7 +34,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
 
   // Ambient breathing rings, purely decorative.
   ctx.save();
-  ctx.strokeStyle = "rgba(58, 71, 80, 0.06)";
+  ctx.strokeStyle = `rgba(${THEME.inkRgb}, 0.07)`;
   ctx.lineWidth = 1.5;
   for (let i = 1; i <= 3; i++) {
     const wobble = Math.sin(s.now / 2200 + i) * 6;
@@ -45,7 +46,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
 
   // Core / target zone.
   ctx.beginPath();
-  ctx.strokeStyle = "rgba(58, 71, 80, 0.18)";
+  ctx.strokeStyle = `rgba(${THEME.inkRgb}, 0.2)`;
   ctx.lineWidth = 2;
   ctx.arc(CENTER.x, CENTER.y, CORE_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
@@ -69,7 +70,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
     const t = age / EFFECT_LIFE_MS;
     ctx.save();
     ctx.globalAlpha = 1 - t;
-    ctx.strokeStyle = e.correct ? e.color : "#b0555088";
+    ctx.strokeStyle = e.correct ? e.color : `${THEME.danger}88`;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(e.x, e.y, 10 + t * 26, 0, Math.PI * 2);
@@ -79,9 +80,9 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
 
   // HUD: time bar.
   const progress = Math.min(1, s.elapsedMs / ROUND_DURATION_MS);
-  ctx.fillStyle = "rgba(58, 71, 80, 0.10)";
+  ctx.fillStyle = `rgba(${THEME.inkRgb}, 0.1)`;
   ctx.fillRect(24, 20, LOGICAL_SIZE - 48, 5);
-  ctx.fillStyle = "rgba(74, 106, 122, 0.65)";
+  ctx.fillStyle = `rgba(${THEME.accentRgb}, 0.75)`;
   ctx.fillRect(24, 20, (LOGICAL_SIZE - 48) * (1 - progress), 5);
 
   const secondsLeft = Math.max(0, Math.ceil((ROUND_DURATION_MS - s.elapsedMs) / 1000));
@@ -105,7 +106,7 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
     const alpha = Math.min(1, (s.bannerUntil - s.now) / 1600);
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "rgba(58, 71, 80, 0.9)";
+    ctx.fillStyle = `rgba(${THEME.inkRgb}, 0.9)`;
     ctx.textAlign = "center";
     ctx.font = "600 18px system-ui, sans-serif";
     ctx.fillText("New target", CENTER.x, CENTER.y - 70);
@@ -120,9 +121,9 @@ export function renderFrame(ctx: CanvasRenderingContext2D, s: RenderState) {
   // Attention-tracking pause — drawn last, over everything else.
   if (s.paused) {
     ctx.save();
-    ctx.fillStyle = "rgba(244, 241, 236, 0.88)";
+    ctx.fillStyle = `rgba(${THEME.surfaceRgb}, 0.9)`;
     ctx.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
-    ctx.fillStyle = "rgba(58, 71, 80, 0.9)";
+    ctx.fillStyle = `rgba(${THEME.inkRgb}, 0.9)`;
     ctx.textAlign = "center";
     ctx.font = "600 20px system-ui, sans-serif";
     ctx.fillText("Paused", CENTER.x, CENTER.y - 12);

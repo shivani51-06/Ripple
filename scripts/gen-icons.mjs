@@ -60,7 +60,7 @@ function makePng(size, [r, g, b]) {
 }
 
 mkdirSync("public/icons", { recursive: true });
-const teal = [74, 106, 122]; // #4a6a7a
-writeFileSync("public/icons/icon-192.png", makePng(192, teal));
-writeFileSync("public/icons/icon-512.png", makePng(512, teal));
+const brown = [74, 51, 35]; // #4a3323
+writeFileSync("public/icons/icon-192.png", makePng(192, brown));
+writeFileSync("public/icons/icon-512.png", makePng(512, brown));
 console.log("Generated placeholder icons.");

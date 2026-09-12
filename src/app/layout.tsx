@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ripple — Focus Training",
+  title: "Ripple: Focus Training",
   description: "A short, calm attention-training game. Not another feed to scroll.",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4a6a7a",
+  themeColor: "#e9d3a8",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

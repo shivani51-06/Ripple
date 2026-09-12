@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { predictFocusScore } from "@/lib/ml/predictFocusScore";
 import { AttentionConsent } from "./AttentionConsent";
 import { getStoredConsent, useAttentionTracking } from "@/lib/attention/useAttentionTracking";
+import { THEME } from "@/lib/theme";
 import Link from "next/link";
 
 function switchAccuracy(switchEvents: SwitchEvent[]): number {
@@ -372,7 +373,7 @@ export function RippleGame() {
 
         {phase === "ready" && (
           <Overlay>
-            <p className="text-sm" style={{ color: "#8a9399" }}>
+            <p className="text-sm" style={{ color: THEME.inkMuted }}>
               Tap only the shape below. Let everything else drift past.
             </p>
             <ShapePreview shape={target.shape} hue={target.hue} size={72} />
@@ -384,13 +385,13 @@ export function RippleGame() {
 
         {phase === "summary" && scoreResult && (
           <Overlay>
-            <p className="text-sm uppercase tracking-wide" style={{ color: "#8a9399" }}>
+            <p className="text-sm uppercase tracking-wide" style={{ color: THEME.inkMuted }}>
               Focus score
             </p>
-            <p className="text-5xl font-semibold" style={{ color: "#2f3e46" }}>
+            <p className="text-5xl font-semibold" style={{ color: THEME.ink }}>
               {scoreResult.focusScore}
             </p>
-            <div className="text-sm" style={{ color: "#52616b" }}>
+            <div className="text-sm" style={{ color: THEME.inkMuted }}>
               <p>Accuracy on target: {Math.round(scoreResult.goAccuracy * 100)}%</p>
               <p>Correctly ignored decoys: {Math.round(scoreResult.inhibitionAccuracy * 100)}%</p>
               {scoreResult.meanReactionMs !== null && (
@@ -400,14 +401,14 @@ export function RippleGame() {
 
             {idToken ? (
               streakInfo && (
-                <p className="text-sm" style={{ color: "#4a6a7a" }}>
+                <p className="text-sm" style={{ color: THEME.accent }}>
                   {streakInfo.countedTowardStreak
                     ? `Streak: ${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? "" : "s"}`
                     : "Streak already counted for today"}
                 </p>
               )
             ) : (
-              <Link href="/account" className="text-sm underline" style={{ color: "#8a9399" }}>
+              <Link href="/account" className="text-sm underline" style={{ color: THEME.inkMuted }}>
                 Sign in to save your streak
               </Link>
             )}
@@ -434,16 +435,16 @@ export function RippleGame() {
           <button
             onClick={() => setMuted((m) => !m)}
             className="text-xs"
-            style={{ color: "#9aa5ab" }}
+            style={{ color: THEME.inkFaint }}
           >
             {muted ? "Sound off" : "Sound on"}
           </button>
-          <button onClick={handleToggleAttention} className="text-xs" style={{ color: "#9aa5ab" }}>
+          <button onClick={handleToggleAttention} className="text-xs" style={{ color: THEME.inkFaint }}>
             {attention.enabled ? "Attention tracking on" : "Track attention with camera"}
           </button>
         </div>
         {attention.error && (
-          <p className="text-xs" style={{ color: "#b05550" }}>
+          <p className="text-xs" style={{ color: THEME.danger }}>
             {attention.error}
           </p>
         )}
@@ -456,7 +457,7 @@ function Overlay({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center"
-      style={{ background: "rgba(244, 241, 236, 0.92)" }}
+      style={{ background: `rgba(${THEME.surfaceRgb}, 0.94)` }}
     >
       {children}
     </div>

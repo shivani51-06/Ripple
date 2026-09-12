@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { THEME } from "@/lib/theme";
 
 type Mode = "sign-in" | "sign-up" | "confirm";
 
@@ -42,7 +43,7 @@ export default function AccountPage() {
   if (idToken) {
     return (
       <Shell>
-        <p style={{ color: "#52616b" }}>You&apos;re signed in.</p>
+        <p style={{ color: THEME.inkMuted }}>You&apos;re signed in.</p>
         <button
           className="btn-primary"
           onClick={() => {
@@ -57,7 +58,7 @@ export default function AccountPage() {
 
   return (
     <Shell>
-      <div className="flex gap-4 text-sm" style={{ color: "#8a9399" }}>
+      <div className="flex gap-4 text-sm" style={{ color: THEME.inkMuted }}>
         <button
           onClick={() => setMode("sign-in")}
           style={{ fontWeight: mode === "sign-in" ? 600 : 400 }}
@@ -82,7 +83,7 @@ export default function AccountPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "#d8d3c9" }}
+              style={{ borderColor: THEME.inkFaint }}
             />
             <input
               type="password"
@@ -92,13 +93,13 @@ export default function AccountPage() {
               required
               minLength={8}
               className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "#d8d3c9" }}
+              style={{ borderColor: THEME.inkFaint }}
             />
           </>
         )}
         {mode === "confirm" && (
           <>
-            <p className="text-sm" style={{ color: "#52616b" }}>
+            <p className="text-sm" style={{ color: THEME.inkMuted }}>
               Enter the code emailed to {email}.
             </p>
             <input
@@ -108,13 +109,13 @@ export default function AccountPage() {
               onChange={(e) => setCode(e.target.value)}
               required
               className="rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "#d8d3c9" }}
+              style={{ borderColor: THEME.inkFaint }}
             />
           </>
         )}
 
         {error && (
-          <p className="text-sm" style={{ color: "#b05550" }}>
+          <p className="text-sm" style={{ color: THEME.danger }}>
             {error}
           </p>
         )}
@@ -129,11 +130,8 @@ export default function AccountPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 text-center"
-      style={{ background: "#f4f1ec" }}
-    >
-      <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#2f3e46" }}>
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 text-center">
+      <h1 className="text-2xl font-semibold tracking-tight" style={{ color: THEME.ink }}>
         Ripple account
       </h1>
       {children}
