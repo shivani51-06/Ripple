@@ -10,6 +10,10 @@ export class RippleStack extends cdk.Stack {
 
     const userPool = new cognito.UserPool(this, "RippleUserPool", {
       userPoolName: "ripple-users",
+      // Lite is free indefinitely (fewer advanced-security features, which
+      // this project doesn't use anyway). The default, Essentials, only has
+      // a 12-month free trial and then bills per active user.
+      featurePlan: cognito.FeaturePlan.LITE,
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -37,12 +41,18 @@ export class RippleStack extends cdk.Stack {
       },
     });
 
-    // Streak + profile state, one row per user. On-demand billing since
-    // traffic is small and bursty (portfolio project, not production scale).
+    // Provisioned (not on-demand) and pinned well under AWS's permanent
+    // always-free tier (25 RCU + 25 WCU + 25GB storage per account, forever,
+    // shared across both tables below) so this genuinely costs $0 rather
+    // than "a fraction of a cent per request" under on-demand billing.
+    const FREE_TIER_CAPACITY = { readCapacity: 5, writeCapacity: 5 };
+
+    // Streak + profile state, one row per user.
     const usersTable = new dynamodb.Table(this, "RippleUsersTable", {
       tableName: "ripple-users",
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      billingMode: dynamodb.BillingMode.PROVISIONED,
+      ...FREE_TIER_CAPACITY,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
@@ -53,7 +63,8 @@ export class RippleStack extends cdk.Stack {
       tableName: "ripple-sessions",
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sessionId", type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      billingMode: dynamodb.BillingMode.PROVISIONED,
+      ...FREE_TIER_CAPACITY,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
