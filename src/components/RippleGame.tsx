@@ -35,6 +35,7 @@ import {
 } from "@/lib/attention/useAttentionTracking";
 import { THEME } from "@/lib/theme";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 function switchAccuracy(switchEvents: SwitchEvent[]): number {
   if (switchEvents.length === 0) return 1;
@@ -50,6 +51,7 @@ interface StreakInfo {
 
 export function RippleGame() {
   const { idToken } = useAuth();
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("ready");
   const [target, setTarget] = useState<TargetSpec>(() => pickRandomTarget());
   const [scoreResult, setScoreResult] = useState<ScoreBreakdown | null>(null);
@@ -139,6 +141,11 @@ export function RippleGame() {
     if (getStoredConsent() === null) {
       setShowConsent(true);
     }
+  }
+
+  function handleWelcomeSignIn() {
+    markIntroSeen();
+    router.push("/account");
   }
 
   async function reportSession(score: ScoreBreakdown) {
@@ -412,6 +419,12 @@ export function RippleGame() {
             <button onClick={startRound} className="btn-primary">
               Start round
             </button>
+
+            {!idToken && (
+              <Link href="/account" className="text-xs underline" style={{ color: THEME.inkFaint }}>
+                Sign in to track your streak
+              </Link>
+            )}
           </Overlay>
         )}
 
@@ -466,7 +479,14 @@ export function RippleGame() {
           />
         )}
 
-        {showWelcome && <WelcomeIntro onContinue={handleWelcomeContinue} />}
+        {showWelcome && (
+          <WelcomeIntro
+            onContinue={handleWelcomeContinue}
+            onSignIn={handleWelcomeSignIn}
+            soundOn={!muted}
+            onToggleSound={() => setMuted((m) => !m)}
+          />
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-1">

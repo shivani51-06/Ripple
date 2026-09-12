@@ -12,7 +12,7 @@ export function AttentionConsent({
 }) {
   return (
     <div
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 px-8 text-center"
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 overflow-y-auto px-8 py-8 text-center"
       style={{ background: `rgba(${THEME.surfaceRgb}, 0.97)` }}
     >
       <h2 className="text-lg font-semibold" style={{ color: THEME.ink }}>
