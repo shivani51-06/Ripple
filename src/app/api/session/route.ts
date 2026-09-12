@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, USERS_TABLE, SESSIONS_TABLE } from "@/lib/dynamo";
 import { applyRoundToStreak, type UserStreakRecord } from "@/lib/streak";
 import { predictNextStartProgress } from "@/lib/ml/predictDifficulty";
-
-// Built lazily (not at module load) so a missing env var only fails a real
-// request, not the production build itself.
-let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null;
-function getVerifier() {
-  if (!verifier) {
-    verifier = CognitoJwtVerifier.create({
-      userPoolId: process.env.COGNITO_USER_POOL_ID!,
-      tokenUse: "id",
-      clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!,
-    });
-  }
-  return verifier;
-}
+import { getUserId } from "@/lib/auth/verifyToken";
 
 interface SessionSummaryPayload {
   focusScore: number;
@@ -33,18 +19,9 @@ interface SessionSummaryPayload {
 }
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token) {
-    return NextResponse.json({ error: "Missing bearer token" }, { status: 401 });
-  }
-
-  let userId: string;
-  try {
-    const payload = await getVerifier().verify(token);
-    userId = payload.sub;
-  } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) {
+    return NextResponse.json({ error: "Missing or invalid bearer token" }, { status: 401 });
   }
 
   const summary = (await req.json()) as SessionSummaryPayload;

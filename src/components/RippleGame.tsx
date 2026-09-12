@@ -433,11 +433,16 @@ export function RippleGame() {
 
             {idToken ? (
               streakInfo && (
-                <p className="text-sm" style={{ color: THEME.accent }}>
-                  {streakInfo.countedTowardStreak
-                    ? `Streak: ${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? "" : "s"}`
-                    : "Streak already counted for today"}
-                </p>
+                <div className="flex flex-col items-center gap-1">
+                  <p className="text-sm" style={{ color: THEME.accent }}>
+                    {streakInfo.countedTowardStreak
+                      ? `Streak: ${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? "" : "s"}`
+                      : "Streak already counted for today"}
+                  </p>
+                  <Link href="/stats" className="text-xs underline" style={{ color: THEME.inkMuted }}>
+                    View your progress
+                  </Link>
+                </div>
               )
             ) : (
               <Link href="/account" className="text-sm underline" style={{ color: THEME.inkMuted }}>

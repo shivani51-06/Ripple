@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { THEME } from "@/lib/theme";
 
@@ -44,6 +45,9 @@ export default function AccountPage() {
     return (
       <Shell>
         <p style={{ color: THEME.inkMuted }}>You&apos;re signed in.</p>
+        <Link href="/stats" className="text-sm underline" style={{ color: THEME.accent }}>
+          View your stats
+        </Link>
         <button
           className="btn-primary"
           onClick={() => {
