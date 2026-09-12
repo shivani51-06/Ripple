@@ -82,6 +82,29 @@ export function RippleGame() {
     }
   }
 
+  async function reportTelemetry(score: ScoreBreakdown) {
+    // Unlike reportSession, this runs whether or not the player is signed
+    // in — raw telemetry for model retraining is useful from anonymous
+    // play too, and the game must work fully without an account.
+    const token = idTokenRef.current;
+    try {
+      await fetch("/api/telemetry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          ...telemetryRef.current,
+          roundDurationMs: ROUND_DURATION_MS,
+          focusScore: score.focusScore,
+        }),
+      });
+    } catch {
+      // Best-effort upload — never blocks or interrupts the round summary.
+    }
+  }
+
   function startRound() {
     // Reuses whatever target is already shown on the ready screen — it must
     // never change between "here's your target" and the round actually
@@ -124,6 +147,7 @@ export function RippleGame() {
       setScoreResult(result);
       setPhase("summary");
       reportSession(result);
+      reportTelemetry(result);
     }
 
     function frame(now: number) {

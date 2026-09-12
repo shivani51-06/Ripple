@@ -48,3 +48,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# AWS IAM access key CSVs (downloaded from the console) must never be committed
+*_accessKeys.csv

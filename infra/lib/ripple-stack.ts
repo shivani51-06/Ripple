@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
 
 export class RippleStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -68,6 +69,19 @@ export class RippleStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    // Raw per-round telemetry (per-tap reaction times, switch-response
+    // timing) for later offline model training — the summarized record
+    // above is what the app displays, this is the training data source.
+    // Auto-expires after 90 days as a cost/cleanup safety net, not a
+    // retention policy requirement.
+    const telemetryBucket = new s3.Bucket(this, "RippleTelemetryBucket", {
+      bucketName: `ripple-telemetry-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      lifecycleRules: [{ expiration: cdk.Duration.days(90) }],
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // Least-privilege credentials for the Vercel serverless API routes to
     // read/write these two tables. Vercel functions run outside AWS with no
     // OIDC federation set up, so a scoped IAM user + access key is the
@@ -77,11 +91,13 @@ export class RippleStack extends cdk.Stack {
     });
     usersTable.grantReadWriteData(apiUser);
     sessionsTable.grantReadWriteData(apiUser);
+    telemetryBucket.grantWrite(apiUser);
 
     new cdk.CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, "UsersTableName", { value: usersTable.tableName });
     new cdk.CfnOutput(this, "SessionsTableName", { value: sessionsTable.tableName });
+    new cdk.CfnOutput(this, "TelemetryBucketName", { value: telemetryBucket.bucketName });
     new cdk.CfnOutput(this, "ApiUserName", { value: apiUser.userName });
   }
 }
