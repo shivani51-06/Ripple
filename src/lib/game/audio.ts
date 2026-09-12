@@ -13,25 +13,42 @@ export class RippleAudio {
     return this.ctx;
   }
 
+  // Target gain when unmuted and playing. Kept as one constant since
+  // multiple places (mute toggle, start, resume-after-pause) all need to
+  // ramp toward the same "on" level.
+  private static readonly AMBIENCE_GAIN = 0.14;
+
   setMuted(muted: boolean) {
     this.muted = muted;
     if (this.padGain) {
-      this.padGain.gain.setTargetAtTime(muted ? 0 : 0.05, this.ensureContext().currentTime, 0.4);
+      const target = muted ? 0 : RippleAudio.AMBIENCE_GAIN;
+      this.padGain.gain.setTargetAtTime(target, this.ensureContext().currentTime, 0.4);
     }
   }
 
   startAmbience() {
     const ctx = this.ensureContext();
     if (ctx.state === "suspended") ctx.resume();
-    if (this.padGain) return;
+
+    if (this.padGain) {
+      // Already built (e.g. a later round) — just ramp back up instead of
+      // silently no-op-ing, since stopAmbience left the gain at 0.
+      const target = this.muted ? 0 : RippleAudio.AMBIENCE_GAIN;
+      this.padGain.gain.setTargetAtTime(target, ctx.currentTime, 0.6);
+      return;
+    }
 
     const gain = ctx.createGain();
     gain.gain.value = 0;
     gain.connect(ctx.destination);
     this.padGain = gain;
-    gain.gain.setTargetAtTime(this.muted ? 0 : 0.05, ctx.currentTime, 1.2);
+    const target = this.muted ? 0 : RippleAudio.AMBIENCE_GAIN;
+    gain.gain.setTargetAtTime(target, ctx.currentTime, 0.6);
 
-    for (const freq of [110, 165, 220]) {
+    // Frequencies picked to stay audible on small phone speakers, which
+    // roll off heavily below ~200Hz — the original bass-register tones
+    // (110/165/220Hz) were nearly inaudible on real device hardware.
+    for (const freq of [220, 330, 440]) {
       const osc = ctx.createOscillator();
       osc.type = "sine";
       osc.frequency.value = freq;
